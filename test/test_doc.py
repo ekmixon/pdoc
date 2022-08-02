@@ -93,11 +93,15 @@ def test_builtin_source():
 
 @pytest.mark.skipif(sys.version_info < (3, 9), reason="3.9+ only")
 def test_raising_getdoc():
+
+
+
     class Foo:
         @classmethod
         @property
-        def __doc__(self):
+        def __doc__(cls):
             raise RuntimeError
+
 
     x = Class(Foo.__module__, Foo.__qualname__, Foo, (Foo.__module__, Foo.__qualname__))
     with pytest.warns(RuntimeWarning, match="inspect.getdoc(.+) raised an exception"):

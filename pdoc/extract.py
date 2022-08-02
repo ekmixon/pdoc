@@ -114,23 +114,22 @@ def parse_spec(spec: Union[Path, str]) -> str:
                     file=sys.stderr,
                 )
 
-    if isinstance(spec, Path):
-        if (spec.parent / "__init__.py").exists():
-            return parse_spec(spec.parent) + f".{spec.stem}"
-        if str(spec.parent) not in sys.path:
-            sys.path.insert(0, str(spec.parent))
-        if spec.stem in sys.modules:
-            local_dir = spec.absolute()
-            origin = Path(sys.modules[spec.stem].__file__).absolute()
-            if local_dir not in (origin, origin.parent):
-                print(
-                    f"Warning: pdoc cannot load {spec.stem!r} because a module with the same name is already "
-                    f"imported in pdoc's Python process. pdoc will document the loaded module from {origin} instead.",
-                    file=sys.stderr,
-                )
-        return spec.stem
-    else:
+    if not isinstance(spec, Path):
         return spec
+    if (spec.parent / "__init__.py").exists():
+        return f"{parse_spec(spec.parent)}.{spec.stem}"
+    if str(spec.parent) not in sys.path:
+        sys.path.insert(0, str(spec.parent))
+    if spec.stem in sys.modules:
+        local_dir = spec.absolute()
+        origin = Path(sys.modules[spec.stem].__file__).absolute()
+        if local_dir not in (origin, origin.parent):
+            print(
+                f"Warning: pdoc cannot load {spec.stem!r} because a module with the same name is already "
+                f"imported in pdoc's Python process. pdoc will document the loaded module from {origin} instead.",
+                file=sys.stderr,
+            )
+    return spec.stem
 
 
 @contextmanager
@@ -141,11 +140,7 @@ def mock_some_common_side_effects():
 
     Note that this function must not be used for security purposes, it's easily bypassable.
     """
-    if platform.system() == "Windows":  # pragma: no cover
-        noop_exe = "echo.exe"
-    else:  # pragma: no cover
-        noop_exe = "echo"
-
+    noop_exe = "echo.exe" if platform.system() == "Windows" else "echo"
     def noop(*args, **kwargs):
         pass
 
@@ -222,11 +217,7 @@ def walk_packages2(
                 continue
 
             mod_all: list[str] = getattr(module, "__all__", None)
-            if mod_all is not None:
-                filt = mod_all.__contains__
-            else:
-                filt = _all_submodules
-
+            filt = mod_all.__contains__ if mod_all is not None else _all_submodules
             # don't traverse path items we've seen before
             path = [p for p in (getattr(module, "__path__", None) or []) if not seen(p)]
 

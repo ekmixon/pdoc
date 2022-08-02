@@ -15,8 +15,7 @@ class ReadResponse(threading.Thread):
 
     def run(self) -> None:
         while True:
-            data = self.sock.recv(65536)
-            if data:
+            if data := self.sock.recv(65536):
                 self.data.write(data)
             else:
                 return

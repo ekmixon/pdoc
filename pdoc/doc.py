@@ -323,13 +323,10 @@ class Namespace(Doc[T], metaclass=ABCMeta):
     def get(self, identifier: str) -> Optional[Doc]:
         """Returns the documentation object for a particular identifier, or `None` if the identifier cannot be found."""
         head, _, tail = identifier.partition(".")
-        if tail:
-            h = self.members.get(head, None)
-            if isinstance(h, Class):
-                return h.get(tail)
-            return None
-        else:
+        if not tail:
             return self.members.get(identifier, None)
+        h = self.members.get(head, None)
+        return h.get(tail) if isinstance(h, Class) else None
 
 
 class Module(Namespace[types.ModuleType]):
@@ -412,21 +409,20 @@ class Module(Namespace[types.ModuleType]):
                 and mod.modulename.startswith(self.modulename)
             ]
 
-        else:
-            submodules = []
-            for mod in pkgutil.iter_modules(self.obj.__path__, f"{self.fullname}."):  # type: ignore
-                if mod.name.split(".")[-1].startswith("_"):
-                    continue
-                try:
-                    module = extract.load_module(mod.name)
-                except RuntimeError:
-                    warnings.warn(
-                        f"Couldn't import {mod.name}:\n{traceback.format_exc()}",
-                        RuntimeWarning,
-                    )
-                    continue
-                submodules.append(Module(module))
-            return submodules
+        submodules = []
+        for mod in pkgutil.iter_modules(self.obj.__path__, f"{self.fullname}."):  # type: ignore
+            if mod.name.split(".")[-1].startswith("_"):
+                continue
+            try:
+                module = extract.load_module(mod.name)
+            except RuntimeError:
+                warnings.warn(
+                    f"Couldn't import {mod.name}:\n{traceback.format_exc()}",
+                    RuntimeWarning,
+                )
+                continue
+            submodules.append(Module(module))
+        return submodules
 
     @cached_property
     def _documented_members(self) -> set[str]:
@@ -436,8 +432,7 @@ class Module(Namespace[types.ModuleType]):
     def _member_objects(self) -> dict[str, Any]:
         members = {}
 
-        all = _safe_getattr(self.obj, "__all__", False)
-        if all:
+        if all := _safe_getattr(self.obj, "__all__", False):
             for name in all:
                 if name in self.obj.__dict__:
                     val = self.obj.__dict__[name]
@@ -630,8 +625,7 @@ class Class(Namespace[type]):
         for x in _safe_getattr(self.obj, "__orig_bases__", self.obj.__bases__):
             if x is object:
                 continue
-            o = get_origin(x)
-            if o:
+            if o := get_origin(x):
                 bases.append((o.__module__, o.__qualname__, str(x)))
             elif x.__module__ == self.modulename:
                 bases.append((x.__module__, x.__qualname__, x.__qualname__))
@@ -644,10 +638,10 @@ class Class(Namespace[type]):
     @cached_property
     def decorators(self) -> list[str]:
         """A list of all decorators the class is decorated with."""
-        decorators = []
-        for t in doc_ast.parse(self.obj).decorator_list:
-            decorators.append(f"@{doc_ast.unparse(t)}")
-        return decorators
+        return [
+            f"@{doc_ast.unparse(t)}"
+            for t in doc_ast.parse(self.obj).decorator_list
+        ]
 
     @cached_property
     def class_variables(self) -> list["Variable"]:
@@ -768,11 +762,7 @@ class Function(Doc[types.FunctionType]):
                 cls = _safe_getattr(cls, name, None)
             doc = _safe_getdoc(_safe_getattr(cls, self.name, None))
 
-        if doc == object.__init__.__doc__:
-            # inspect.getdoc(Foo.__init__) returns the docstring, for object.__init__ if left undefined...
-            return ""
-        else:
-            return doc
+        return "" if doc == object.__init__.__doc__ else doc
 
     @cached_property
     def is_classmethod(self) -> bool:
@@ -791,11 +781,8 @@ class Function(Doc[types.FunctionType]):
     @cached_property
     def decorators(self) -> list[str]:
         """A list of all decorators the function is decorated with."""
-        decorators = []
         obj: types.FunctionType = self.obj  # type: ignore
-        for t in doc_ast.parse(obj).decorator_list:
-            decorators.append(f"@{doc_ast.unparse(t)}")
-        return decorators
+        return [f"@{doc_ast.unparse(t)}" for t in doc_ast.parse(obj).decorator_list]
 
     @cached_property
     def funcdef(self) -> str:
@@ -911,27 +898,23 @@ class Variable(Doc[None]):
     @cached_property
     def is_classvar(self) -> bool:
         """`True` if the variable is a class variable, `False` otherwise."""
-        if get_origin(self.annotation) is ClassVar:
-            return True
-        else:
-            return False
+        return get_origin(self.annotation) is ClassVar
 
     @cached_property
     def default_value_str(self) -> str:
         """The variable's default value as a pretty-printed str."""
-        if self.default_value is empty:
+        if self.default_value is empty or isinstance(
+            self.default_value, _tuplegetter
+        ):
             return ""
-        elif isinstance(self.default_value, _tuplegetter):
-            return ""
-        else:
-            try:
-                return re.sub(
-                    r" at 0x[0-9a-fA-F]+(?=>$)",
-                    "",
-                    f" = {repr(self.default_value)}",
-                )
-            except Exception:
-                return " = <unable to get value representation>"
+        try:
+            return re.sub(
+                r" at 0x[0-9a-fA-F]+(?=>$)",
+                "",
+                f" = {repr(self.default_value)}",
+            )
+        except Exception:
+            return " = <unable to get value representation>"
 
     @cached_property
     def annotation_str(self) -> str:
@@ -994,11 +977,11 @@ class _PrettySignature(inspect.Signature):
             # flag was not reset to 'False'
             result.append("/")
 
-        rendered = "({})".format(", ".join(result))
+        rendered = f'({", ".join(result)})'
 
         if self.return_annotation is not _empty:
             anno = formatannotation(self.return_annotation)
-            rendered += " -> {}".format(anno)
+            rendered += f" -> {anno}"
         # ✂ end ✂
 
         if len(rendered) > 70:
@@ -1011,10 +994,7 @@ class _PrettySignature(inspect.Signature):
 
 def _cut(x: str) -> str:
     """helper function for Doc.__repr__()"""
-    if len(x) < 20:
-        return x
-    else:
-        return x[:20] + "…"
+    return x if len(x) < 20 else f"{x[:20]}…"
 
 
 def _docstr(doc: "Doc") -> str:
@@ -1024,18 +1004,12 @@ def _docstr(doc: "Doc") -> str:
         docstr.append(f"inherited from {'.'.join(doc.taken_from).rstrip('.')}")
     if doc.docstring:
         docstr.append(_cut(doc.docstring))
-    if docstr:
-        return f"  # {', '.join(docstr)}"
-    else:
-        return ""
+    return f"  # {', '.join(docstr)}" if docstr else ""
 
 
 def _decorators(doc: Union["Class", "Function"]) -> str:
     """helper function for Doc.__repr__()"""
-    if doc.decorators:
-        return " ".join(doc.decorators) + " "
-    else:
-        return ""
+    return " ".join(doc.decorators) + " " if doc.decorators else ""
 
 
 def _children(doc: Namespace) -> str:

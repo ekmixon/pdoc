@@ -209,10 +209,6 @@ def _parse_function(source: str) -> Union[ast.FunctionDef, ast.AsyncFunctionDef]
         t = tree.body[0]
         if isinstance(t, (ast.FunctionDef, ast.AsyncFunctionDef)):
             return t
-        else:
-            # we have a lambda function,
-            # to simplify the API return the ast.FunctionDef stub.
-            pass
     return ast.FunctionDef(body=[], decorator_list=[])
 
 
@@ -245,14 +241,10 @@ def _dedent(source: str) -> str:
     if not source or source[0] not in (" ", "\t"):
         return source
     source = source.lstrip()
-    # we may have decorators before our function definition, in which case we need to dedent a few more lines.
-    # the following heuristic should be good enough to detect if we have reached the definition.
-    # it's easy to produce examples where this fails, but this probably is not a problem in practice.
-    if not any(source.startswith(x) for x in ["async ", "def ", "class "]):
-        first_line, rest = source.split("\n", 1)
-        return first_line + "\n" + _dedent(rest)
-    else:
+    if any(source.startswith(x) for x in ["async ", "def ", "class "]):
         return source
+    first_line, rest = source.split("\n", 1)
+    return first_line + "\n" + _dedent(rest)
 
 
 @cache

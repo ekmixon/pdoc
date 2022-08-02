@@ -76,11 +76,10 @@ def resolve_annotations(
     """
     ns = getattr(module, "__dict__", {})
 
-    resolved = {}
-    for name, value in annotations.items():
-        resolved[name] = safe_eval_type(value, ns, fullname)
-
-    return resolved
+    return {
+        name: safe_eval_type(value, ns, fullname)
+        for name, value in annotations.items()
+    }
 
 
 def safe_eval_type(

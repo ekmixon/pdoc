@@ -87,8 +87,6 @@ def make_index(
                     )
                 elif isinstance(m, pdoc.doc.Class):
                     yield from make_index(m)
-                else:
-                    pass
 
         documents.extend(make_index(mod))
 
@@ -107,10 +105,7 @@ def precompile_index(documents: list[dict], compile_js: Path) -> str:
     """
     raw = json.dumps(documents)
     try:
-        if shutil.which("nodejs"):
-            executable = "nodejs"
-        else:
-            executable = "node"
+        executable = "nodejs" if shutil.which("nodejs") else "node"
         out = subprocess.check_output(
             [executable, compile_js],
             input=raw.encode(),

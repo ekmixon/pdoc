@@ -96,13 +96,9 @@ def split_identifier(all_modules: Collection[str], fullname: str) -> tuple[str, 
         raise ValueError("Invalid identifier.")
     if fullname in all_modules:
         return fullname, ""
-    else:
-        parent, _, name = fullname.rpartition(".")
-        modulename, qualname = split_identifier(all_modules, parent)
-        if qualname:
-            return modulename, f"{qualname}.{name}"
-        else:
-            return modulename, name
+    parent, _, name = fullname.rpartition(".")
+    modulename, qualname = split_identifier(all_modules, parent)
+    return (modulename, f"{qualname}.{name}") if qualname else (modulename, name)
 
 
 def _relative_link(current: list[str], target: list[str]) -> str:
@@ -111,7 +107,7 @@ def _relative_link(current: list[str], target: list[str]) -> str:
     elif target[: len(current)] == current:
         return "/".join(target[len(current) :]) + ".html"
     else:
-        return "../" + _relative_link(current[:-1], target)
+        return f"../{_relative_link(current[:-1], target)}"
 
 
 @cache
@@ -144,7 +140,7 @@ def linkify(context: Context, code: str, namespace: str = "") -> str:
     """
 
     def linkify_repl(m: re.Match):
-        text = m.group(0)
+        text = m[0]
         identifier = removesuffix(text, "()")
 
         # Check if this is a local reference within this module?

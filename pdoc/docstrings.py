@@ -180,12 +180,9 @@ def _numpy_parameters(content: str) -> str:
     """Convert a NumPy-style parameter section into Markdown"""
     contents = ""
     for item in _indented_list(content):
-        m = re.match(r"^(.+):(.+)([\s\S]*)", item)
-        if m:
-            contents += (
-                f" - **{m.group(1).strip()}** ({m.group(2).strip()}):\n"
-                f"{indent(m.group(3).strip(), '   ')}\n"
-            )
+        if m := re.match(r"^(.+):(.+)([\s\S]*)", item):
+            contents += f" - **{m[1].strip()}** ({m[2].strip()}):\n{indent(m[3].strip(), '   ')}\n"
+
         else:
             if "\n" in item:
                 name, desc = item.split("\n", maxsplit=1)
@@ -194,10 +191,7 @@ def _numpy_parameters(content: str) -> str:
             else:
                 name, desc = item.strip(), ""
 
-            if desc:
-                contents += f" - **{name}**: {desc}\n"
-            else:
-                contents += f" - **{name}**\n"
+            contents += f" - **{name}**: {desc}\n" if desc else f" - **{name}**\n"
     return f"{contents}\n"
 
 
@@ -262,10 +256,7 @@ def _rst_footnotes(contents: str) -> str:
             fn_id = f"fn-{autonum}"
             autonum += 1
         fn_id = fn_id.lstrip("#*")
-        if fn_id in footnotes:
-            return f"[^{fn_id}]"
-        else:
-            return m.group(0)
+        return f"[^{fn_id}]" if fn_id in footnotes else m.group(0)
 
     autonum = 1
     contents = re.sub(r"\[(?P<id>\d+|[#*]\w*)]_", replace_references, contents)

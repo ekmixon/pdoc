@@ -55,10 +55,7 @@ class DocHandler(http.server.BaseHTTPRequestHandler):
                 self.end_headers()
                 return render.html_error(error=f"Module {module!r} not found")
 
-            mtime = ""
-            t = extract.module_mtime(module)
-            if t:
-                mtime = f"{t:.1f}"
+            mtime = f"{t:.1f}" if (t := extract.module_mtime(module)) else ""
             if "mtime=1" in self.path:
                 self.send_response(200)
                 self.send_header("content-type", "text/plain")

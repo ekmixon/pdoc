@@ -171,9 +171,7 @@ def fib(n):
     This is an example of decorated function. Decorators are included in the documentation as well.
     This is often useful when documenting web APIs, for example.
     """
-    if n < 2:
-        return n
-    return fib(n - 1) + fib(n - 2)
+    return n if n < 2 else fib(n - 1) + fib(n - 2)
 
 
 def security(test=os.environ):

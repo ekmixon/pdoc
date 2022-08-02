@@ -25,17 +25,13 @@ if sys.version_info >= (3, 9):
     removesuffix = str.removesuffix
 else:  # pragma: no cover
     def removesuffix(x: str, suffix: str):
-        if x.endswith(suffix):
-            x = x[: -len(suffix)]
-        return x
+        return x.removesuffix(suffix)
 
 if sys.version_info >= (3, 9):
     removeprefix = str.removeprefix
 else:  # pragma: no cover
     def removeprefix(x: str, prefix: str):
-        if x.startswith(prefix):
-            x = x[len(prefix):]
-        return x
+        return x.removeprefix(prefix)
 
 if sys.version_info >= (3, 9):
     from typing import ForwardRef
@@ -203,9 +199,7 @@ else:  # pragma: no cover
     def get_origin(tp):  # type: ignore
         if isinstance(tp, GenericAlias):
             return tp.__origin__
-        if tp is Generic:
-            return Generic
-        return None
+        return Generic if tp is Generic else None
 
     def get_args(tp):  # type: ignore
         if isinstance(tp, _GenericAlias):
@@ -213,9 +207,7 @@ else:  # pragma: no cover
             if tp.__origin__ is collections.abc.Callable and res[0] is not Ellipsis:
                 res = (list(res[:-1]), res[-1])
             return res
-        if isinstance(tp, GenericAlias):
-            return tp.__args__
-        return ()
+        return tp.__args__ if isinstance(tp, GenericAlias) else ()
 
 
 if sys.version_info >= (3, 8):

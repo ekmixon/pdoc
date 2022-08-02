@@ -217,21 +217,14 @@ class Markdown(object):
                  extras=None, link_patterns=None,
                  footnote_title=None, footnote_return_symbol=None,
                  use_file_vars=False, cli=False):
-        if html4tags:
-            self.empty_element_suffix = ">"
-        else:
-            self.empty_element_suffix = " />"
+        self.empty_element_suffix = ">" if html4tags else " />"
         self.tab_width = tab_width
         self.tab = tab_width * " "
 
         # For compatibility with earlier markdown2.py and with
         # markdown.py's safe_mode being a boolean,
         #   safe_mode == True -> "replace"
-        if safe_mode is True:
-            self.safe_mode = "replace"
-        else:
-            self.safe_mode = safe_mode
-
+        self.safe_mode = "replace" if safe_mode is True else safe_mode
         # Massaging and building the "extras" info.
         if self.extras is None:
             self.extras = {}
@@ -408,7 +401,7 @@ class Markdown(object):
 
             # Prepend toc html to output
             if self.cli:
-                text = '{}\n{}'.format(self._toc_html, text)
+                text = f'{self._toc_html}\n{text}'
 
         text += "\n"
 
@@ -498,13 +491,8 @@ class Markdown(object):
                         r.append({match[0].strip(): match[1].strip()})
                     elif not match[0] and not match[1] and match[2]:
                         r.append(parse_structured_value(match[2]))
-                    else:
-                        # Broken case
-                        pass
-
                 return r
 
-            # Dict
             else:
                 return {
                     match[0].strip(): (
@@ -566,8 +554,7 @@ class Markdown(object):
         # Search near the start for a '-*-'-style one-liner of variables.
         head = text[:SIZE]
         if "-*-" in head:
-            match = self._emacs_oneliner_vars_pat.search(head)
-            if match:
+            if match := self._emacs_oneliner_vars_pat.search(head):
                 emacs_vars_str = match.group(1)
                 assert '\n' not in emacs_vars_str
                 emacs_var_strs = [s.strip() for s in emacs_vars_str.split(';')
@@ -592,8 +579,7 @@ class Markdown(object):
 
         tail = text[-SIZE:]
         if "Local Variables" in tail:
-            match = self._emacs_local_vars_pat.search(tail)
-            if match:
+            if match := self._emacs_local_vars_pat.search(tail):
                 prefix = match.group("prefix")
                 suffix = match.group("suffix")
                 lines = match.group("content").splitlines(0)
@@ -628,7 +614,7 @@ class Markdown(object):
                             line = line[:-1].rstrip()
                         else:
                             continued_for = None
-                        emacs_vars[variable] += ' ' + line
+                        emacs_vars[variable] += f' {line}'
                     else:
                         try:
                             variable, value = line.split(':', 1)
@@ -682,9 +668,7 @@ class Markdown(object):
         """
         if '\t' not in text:
             return text
-        output = []
-        for line in text.splitlines():
-            output.append(self._detab_line(line))
+        output = [self._detab_line(line) for line in text.splitlines()]
         return '\n'.join(output)
 
     # I broke out the html5 tags here and add them to _block_tags_a and
@@ -731,8 +715,7 @@ class Markdown(object):
             html = self._sanitize_html(html)
         elif 'markdown-in-html' in self.extras and 'markdown=' in html:
             first_line = html.split('\n', 1)[0]
-            m = self._html_markdown_attr_re.search(first_line)
-            if m:
+            if m := self._html_markdown_attr_re.search(first_line):
                 lines = html.split('\n')
                 middle = '\n'.join(lines[1:-1])
                 last_line = lines[-1]
@@ -808,7 +791,7 @@ class Markdown(object):
                 # Validate whitespace before comment.
                 if start_idx:
                     # - Up to `tab_width - 1` spaces before start_idx.
-                    for i in range(self.tab_width - 1):
+                    for _ in range(self.tab_width - 1):
                         if text[start_idx - 1] != ' ':
                             break
                         start_idx -= 1
@@ -820,16 +803,12 @@ class Markdown(object):
                         pass
                     elif start_idx == 1 and text[0] == '\n':
                         start_idx = 0  # to match minute detail of Markdown.pl regex
-                    elif text[start_idx-2:start_idx] == '\n\n':
-                        pass
-                    else:
+                    elif text[start_idx - 2 : start_idx] != '\n\n':
                         break
 
                 # Validate whitespace after comment.
                 # - Any number of spaces and tabs.
-                while end_idx < len(text):
-                    if text[end_idx] not in ' \t':
-                        break
+                while end_idx < len(text) and text[end_idx] in ' \t':
                     end_idx += 1
                 # - Must be following by 2 newlines or hit end of text.
                 if text[end_idx:end_idx+2] not in ('', '\n', '\n\n'):
@@ -940,9 +919,10 @@ class Markdown(object):
                                              match.group(1),
                                              number)
             else:
-                repl = reference_html.format(match.group(1),
-                                             'countererror',
-                                             '?' + match.group(1) + '?')
+                repl = reference_html.format(
+                    match.group(1), 'countererror', f'?{match.group(1)}?'
+                )
+
             if "smarty-pants" in self.extras:
                 repl = repl.replace('"', self._escape_table['"'])
 
@@ -1040,10 +1020,12 @@ class Markdown(object):
         lines = match.group(0).splitlines(0)
         _dedentlines(lines)
         indent = ' ' * self.tab_width
-        s = ('\n'  # separate from possible cuddled paragraph
-             + indent + ('\n'+indent).join(lines)
-             + '\n\n')
-        return s
+        return (
+            '\n'  # separate from possible cuddled paragraph
+            + indent
+            + ('\n' + indent).join(lines)
+            + '\n\n'
+        )
 
     def _prepare_pyshell_blocks(self, text):
         """Ensure that Python interactive shell sessions are put in
@@ -1081,30 +1063,29 @@ class Markdown(object):
                 align_from_col_idx[col_idx] = ' style="text-align:right;"'
 
         # thead
-        hlines = ['<table%s>' % self._html_class_str_from_tag('table'), '<thead>', '<tr>']
-        cols = [re.sub(escape_bar_re, '|', cell.strip()) for cell in re.split(split_bar_re, re.sub(trim_bar_re, "", re.sub(trim_space_re, "", head)))]
-        for col_idx, col in enumerate(cols):
-            hlines.append('  <th%s>%s</th>' % (
-                align_from_col_idx.get(col_idx, ''),
-                self._run_span_gamut(col)
-            ))
-        hlines.append('</tr>')
-        hlines.append('</thead>')
+        hlines = [
+            f"<table{self._html_class_str_from_tag('table')}>",
+            '<thead>',
+            '<tr>',
+        ]
 
-        # tbody
-        hlines.append('<tbody>')
+        cols = [re.sub(escape_bar_re, '|', cell.strip()) for cell in re.split(split_bar_re, re.sub(trim_bar_re, "", re.sub(trim_space_re, "", head)))]
+        hlines.extend(
+            f"  <th{align_from_col_idx.get(col_idx, '')}>{self._run_span_gamut(col)}</th>"
+            for col_idx, col in enumerate(cols)
+        )
+
+        hlines.extend(('</tr>', '</thead>', '<tbody>'))
         for line in body.strip('\n').split('\n'):
             hlines.append('<tr>')
             cols = [re.sub(escape_bar_re, '|', cell.strip()) for cell in re.split(split_bar_re, re.sub(trim_bar_re, "", re.sub(trim_space_re, "", line)))]
-            for col_idx, col in enumerate(cols):
-                hlines.append('  <td%s>%s</td>' % (
-                    align_from_col_idx.get(col_idx, ''),
-                    self._run_span_gamut(col)
-                ))
-            hlines.append('</tr>')
-        hlines.append('</tbody>')
-        hlines.append('</table>')
+            hlines.extend(
+                f"  <td{align_from_col_idx.get(col_idx, '')}>{self._run_span_gamut(col)}</td>"
+                for col_idx, col in enumerate(cols)
+            )
 
+            hlines.append('</tr>')
+        hlines.extend(('</tbody>', '</table>'))
         return '\n'.join(hlines) + '\n'
 
     def _do_tables(self, text):
@@ -1154,7 +1135,7 @@ class Markdown(object):
         def format_cell(text):
             return self._run_span_gamut(re.sub(r"^\s*~", "", cell).strip(" "))
 
-        add_hline('<table%s>' % self._html_class_str_from_tag('table'))
+        add_hline(f"<table{self._html_class_str_from_tag('table')}>")
         # Check if first cell of first row is a header cell. If so, assume the whole row is a header row.
         if rows and rows[0] and re.match(r"^\s*~", rows[0][0]):
             add_hline('<thead>', 1)
