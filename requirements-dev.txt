@@ -30,3 +30,4 @@ tox==3.23.1
 typed-ast==1.4.3
 typing-extensions==3.10.0.0
 virtualenv==20.4.6
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
